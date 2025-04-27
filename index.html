@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="CONTENT-TYPE" content="text/html; charset=UTF-8">
+    <title>WarBuild</title>
+    <style>
+        body {
+            margin: 0px;
+        }
+
+        .title {
+            text-align: center;
+            background-color: #ededed;
+            padding: 10px;
+            font-size: 30px;
+        }
+
+        .topbar button {
+            margin: 2px;
+        }
+
+        .topbar {
+            background-color: #ededed;
+            padding: 5px 5px;
+            display: flex;
+            justify-content: center;
+            align-content: center;
+        }
+
+        .draggable {
+            position: absolute; /* Required for positioning during drag */
+            cursor: grab; /* Indicate it's draggable */
+        }
+
+        .properties-panel {
+            display: none; /* Initially hidden */
+            position: fixed; /* Stay in place when scrolling */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* Center the panel */
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000; /* Ensure it's on top of other elements */
+            text-align: center;
+            max-height: 80vh; /* Limit the maximum height */
+            overflow-y: auto; /* Enable vertical scrolling */
+        }
+
+        .properties-panel label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .properties-panel input[type="text"],
+        .properties-panel input[type="number"],
+        .properties-panel input[type="color"],
+        .properties-panel input[type="file"] {
+            width: calc(100% - 16px); /* Adjust for padding */
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+
+        .properties-panel button {
+            margin-top: 15px;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<div class="title">
+    <strong>WarBuild</strong>
+</div>
+<div class="topbar">
+    <button onclick="newtext()">Text</button>
+    <button onclick="newbutton()">Button</button>
+    <button onclick="newbox()">Box</button>
+    <button onclick="newimage()">Image</button>
+    <button style="margin-left: 30px; margin-right: 10px;" onclick="showPropertiesPanel()">Properties</button>
+</div>
+
+<div id="propertiesPanel" class="properties-panel">
+    <h3>Properties</h3>
+    <label for="fontSize">Font Size:</label>
+    <input type="number" id="fontSize" oninput="updateProperty('fontSize', this.value + 'px')">
+
+    <label for="width">Width:</label>
+    <input type="text" id="width" oninput="updateProperty('width', this.value)">
+
+    <label for="height">Height:</label>
+    <input type="text" id="height" oninput="updateProperty('height', this.value)">
+
+    <label for="size">Border Radius:</label>
+    <input type="text" id="size" placeholder="e.g., 5px or 50%" oninput="updateProperty('borderRadius', this.value)">
+
+    <label for="color">Color:</label>
+    <input type="color" id="color" oninput="updateProperty('backgroundColor', this.value)">
+
+    <label for="text">Text:</label>
+    <input type="text" id="text" oninput="updateProperty('textContent', this.value)">
+
+    <label for="imageFile">Choose Image:</label>
+    <input type="file" id="imageFile" accept="image/*" onchange="handleImageUpload(this)">
+
+    <label for="imageSrc">Image Source (URL):</label>
+    <input type="text" id="imageSrc" oninput="updateProperty('src', this.value)">
+
+    <button onclick="hidePropertiesPanel()">Close</button>
+</div>
+
+<script>
+    let draggedElement = null;
+    let selectedElement = null;
+    let offsetX, offsetY;
+    const propertiesPanel = document.getElementById('propertiesPanel');
+    const fontSizeInput = document.getElementById('fontSize');
+    const widthInput = document.getElementById('width');
+    const heightInput = document.getElementById('height');
+    const sizeInput = document.getElementById('size');
+    const colorInput = document.getElementById('color');
+    const textInput = document.getElementById('text');
+    const imageSrcInput = document.getElementById('imageSrc');
+    const imageFileInput = document.getElementById('imageFile');
+
+    function showPropertiesPanel() {
+        if (selectedElement) {
+            fontSizeInput.value = getComputedStyle(selectedElement).fontSize;
+            widthInput.value = getComputedStyle(selectedElement).width;
+            heightInput.value = getComputedStyle(selectedElement).height;
+            sizeInput.value = getComputedStyle(selectedElement).borderRadius;
+            colorInput.value = rgbToHex(getComputedStyle(selectedElement).backgroundColor);
+            if (selectedElement.textContent !== undefined) {
+                textInput.value = selectedElement.textContent;
+            } else if (selectedElement.tagName === 'BUTTON') {
+                textInput.value = selectedElement.innerText;
+            } else if (selectedElement.tagName === 'DIV') {
+                textInput.placeholder = 'No text content';
+                textInput.value = '';
+            } else if (selectedElement.tagName === 'IMG') {
+                imageSrcInput.value = selectedElement.src;
+            }
+            propertiesPanel.style.display = 'block';
+        } else {
+            alert('Please select an element first.');
+        }
+    }
+
+    function hidePropertiesPanel() {
+        propertiesPanel.style.display = 'none';
+        if (selectedElement) {
+            selectedElement.style.border = '';
+            selectedElement = null;
+        }
+        // Reset the file input to allow re-selection of the same file
+        if (imageFileInput) {
+            imageFileInput.value = '';
+        }
+    }
+
+    function updateProperty(property, value) {
+        if (selectedElement) {
+            selectedElement.style[property] = value;
+            if (property === 'textContent') {
+                selectedElement.textContent = value;
+            } else if (property === 'innerText' && selectedElement.tagName === 'BUTTON') {
+                selectedElement.innerText = value;
+            }
+        }
+    }
+
+    function selectElement(element) {
+        if (selectedElement) {
+            selectedElement.style.border = '';
+        }
+        selectedElement = element;
+        selectedElement.style.border = '2px solid blue';
+    }
+
+    function makeDraggable(element) {
+        element.classList.add("draggable");
+        element.addEventListener('mousedown', startDrag);
+        element.addEventListener('touchstart', startDrag, {passive: false});
+        element.onclick = function () {
+            selectElement(this);
+        };
+    }
+
+    function startDrag(e) {
+        draggedElement = this;
+        if (e.type === 'mousedown') {
+            offsetX = e.clientX - draggedElement.getBoundingClientRect().left;
+            offsetY = e.clientY - draggedElement.getBoundingClientRect().top;
+        } else if (e.type === 'touchstart') {
+            offsetX = e.touches[0].clientX - draggedElement.getBoundingClientRect().left;
+            offsetY = e.touches[0].clientY - draggedElement.getBoundingClientRect().top;
+        }
+        draggedElement.style.cursor = 'grabbing';
+    }
+
+    function drag(e) {
+        if (!draggedElement) return;
+        e.preventDefault();
+
+        let clientX, clientY;
+        if (e.type === 'mousemove') {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        } else if (e.type === 'touchmove') {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        }
+
+        console.log('clientY:', clientY, 'offsetY:', offsetY); // Debugging line
+
+        draggedElement.style.left = clientX - offsetX + 'px';
+        draggedElement.style.top = clientY - offsetY + 'px';
+    }
+
+    function endDrag() {
+        if (!draggedElement) return;
+        draggedElement.style.cursor = 'grab';
+        draggedElement = null;
+    }
+
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('touchmove', drag, {passive: false});
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+    document.addEventListener('touchcancel', endDrag);
+
+    function newtext() {
+        let text = document.createElement("a");
+        text.textContent = "Text";
+        document.body.appendChild(text);
+        makeDraggable(text);
+    }
+    function newbutton() {
+        let button = document.createElement("button");
+        button.textContent = "Button";
+        document.body.appendChild(button);
+        makeDraggable(button);
+    }
+    function newbox() {
+        let box = document.createElement("div");
+        box.style.backgroundColor = "#ededed";
+        box.style.padding = "50px 50px";
+        document.body.appendChild(box);
+        makeDraggable(box);
+    }
+    function newimage() {
+        let img = document.createElement("img");
+        img.src = "https://www.picsum.photos/1000/1000"; // Default image
+        img.style.width = "150px";
+        img.style.height = "150px";
+        document.body.appendChild(img);
+        makeDraggable(img);
+    }
+
+    function handleImageUpload(input) {
+        if (input.files && input.files[0] && selectedElement && selectedElement.tagName === 'IMG') {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                selectedElement.src = e.target.result;
+                // Optionally, update the imageSrc input field
+                imageSrcInput.value = e.target.result;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function rgbToHex(rgb) {
+        const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+        if (match) {
+            return '#' + match.slice(1, 4).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+        }
+        return '';
+    }
+</script>
+</body>
+  </html>
+  
