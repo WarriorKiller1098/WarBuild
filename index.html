@@ -70,6 +70,15 @@
             padding: 10px 15px;
             cursor: pointer;
         }
+
+        #exitPreviewButton {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            padding: 10px 15px;
+            cursor: pointer;
+            z-index: 1001; /* Ensure it's above other elements */
+        }
     </style>
 </head>
 <body>
@@ -82,6 +91,9 @@
     <button onclick="newbox()">Box</button>
     <button onclick="newimage()">Image</button>
     <button style="margin-left: 30px; margin-right: 10px;" onclick="showPropertiesPanel()">Properties</button>
+    <button onclick="saveProject()">Save</button>
+    <button onclick="loadProject()">Load</button>
+    <button onclick="togglePreview()">Preview</button>
 </div>
 
 <div id="propertiesPanel" class="properties-panel">
@@ -113,6 +125,8 @@
     <button onclick="hidePropertiesPanel()">Close</button>
 </div>
 
+<input type="file" id="loadFileInput" accept=".json" style="display: none;">
+
 <script>
     let draggedElement = null;
     let selectedElement = null;
@@ -126,6 +140,9 @@
     const textInput = document.getElementById('text');
     const imageSrcInput = document.getElementById('imageSrc');
     const imageFileInput = document.getElementById('imageFile');
+    let isInPreviewMode = false;
+    const topbar = document.querySelector('.topbar');
+    let currentlySelectedElement = null; // To remember the selected element when exiting preview
 
     function showPropertiesPanel() {
         if (selectedElement) {
@@ -184,7 +201,7 @@
     function makeDraggable(element) {
         element.classList.add("draggable");
         element.addEventListener('mousedown', startDrag);
-        element.addEventListener('touchstart', startDrag, {passive: false});
+        element.addEventListener('touchstart', startDrag, { passive: false });
         element.onclick = function () {
             selectElement(this);
         };
@@ -192,13 +209,18 @@
 
     function startDrag(e) {
         draggedElement = this;
+        let currentClientY;
         if (e.type === 'mousedown') {
             offsetX = e.clientX - draggedElement.getBoundingClientRect().left;
             offsetY = e.clientY - draggedElement.getBoundingClientRect().top;
+            currentClientY = e.clientY;
         } else if (e.type === 'touchstart') {
             offsetX = e.touches[0].clientX - draggedElement.getBoundingClientRect().left;
             offsetY = e.touches[0].clientY - draggedElement.getBoundingClientRect().top;
+            currentClientY = e.touches[0].clientY;
         }
+        console.log('Dragging started on:', draggedElement.tagName, 'clientY:', currentClientY, 'getBoundingClientRect().top:', draggedElement.getBoundingClientRect().top); // Debugging
+        console.log('offsetY:', offsetY); // Debugging
         draggedElement.style.cursor = 'grabbing';
     }
 
@@ -212,10 +234,8 @@
             clientY = e.clientY;
         } else if (e.type === 'touchmove') {
             clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
+            clientY = e.clientY;
         }
-
-        console.log('clientY:', clientY, 'offsetY:', offsetY); // Debugging line
 
         draggedElement.style.left = clientX - offsetX + 'px';
         draggedElement.style.top = clientY - offsetY + 'px';
@@ -254,7 +274,7 @@
     }
     function newimage() {
         let img = document.createElement("img");
-        img.src = "https://www.picsum.photos/1000/1000"; // Default image
+        img.src = "https://via.placeholder.com/150"; // Default image
         img.style.width = "150px";
         img.style.height = "150px";
         document.body.appendChild(img);
@@ -280,7 +300,159 @@
         }
         return '';
     }
-</script>
-</body>
-  </html>
-  
+
+    function saveProject() {
+        const projectData = [];
+        const elements = document.body.children;
+
+        // Iterate through the body's children to collect saveable elements
+        for (let i = 0; i < elements.length; i++) {
+            const element = elements[i];
+
+            // Skip the title and topbar
+            if (element.classList.contains('title') || element.classList.contains('topbar') || element.id === 'propertiesPanel') {
+                continue;
+            }
+
+            const elementData = {
+                tagName: element.tagName,
+                textContent: element.textContent,
+                innerText: element.innerText,
+                src: element.src,
+                style: {
+                    position: element.style.position,
+                    left: element.style.left,
+                    top: element.style.top,
+                    fontSize: element.style.fontSize,
+                    width: element.style.width,
+                    height: element.style.height,
+                    backgroundColor: element.style.backgroundColor,
+                    borderRadius: element.style.borderRadius
+                }
+            };
+            projectData.push(elementData);
+        }
+
+        // Convert the data to JSON format
+        const jsonString = JSON.stringify(projectData);
+
+        // Create a Blob with the JSON data
+        const blob = new Blob([jsonString], { type: 'application/json' });
+
+        // Create a temporary link to trigger the download
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'warbuild_project.json';
+
+        // Programmatically click the link to start the download
+        document.body.appendChild(a);
+        a.click();
+
+        // Clean up the temporary link
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+
+        alert('Project saved!');
+    }
+
+    function loadProject() {
+        document.getElementById('loadFileInput').click();
+    }
+
+    document.getElementById('loadFileInput').addEventListener('change', handleFileLoad);
+
+    function handleFileLoad(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const projectData = JSON.parse(e.target.result);
+                    // Clear the current canvas (remove existing draggable elements)
+                    const draggableElements = document.querySelectorAll('.draggable');
+                    draggableElements.forEach(element => {
+                        document.body.removeChild(element);
+                    });
+
+                    // Recreate elements from the loaded data
+                    projectData.forEach(item => {
+                        let newElement;
+                        switch (item.tagName.toUpperCase()) {
+                            case 'A':
+                                newElement = document.createElement('a');
+                                newElement.textContent = item.textContent;
+                                break;
+                            case 'BUTTON':
+                                newElement = document.createElement('button');
+                                newElement.innerText = item.innerText;
+                                break;
+                            case 'DIV':
+                                newElement = document.createElement('div');
+                                break;
+                            case 'IMG':
+                                newElement = document.createElement('img');
+                                newElement.src = item.src;
+                                break;
+                            default:
+                                console.warn('Unknown element tag:', item.tagName);
+                                return;
+                        }
+
+                        // Apply saved styles
+                        if (item.style) {
+                            for (const styleProp in item.style) {
+                                if (item.style.hasOwnProperty(styleProp) && item.style[styleProp]) {
+                                    newElement.style[styleProp] = item.style[styleProp];
+                                }
+                            }
+                        }
+
+                        document.body.appendChild(newElement);
+                        makeDraggable(newElement);
+                    });
+                    alert('Project loaded!');
+                } catch (error) {
+                    console.error('Error loading project:', error);
+                    alert('Failed to load project. Invalid file format.');
+                }
+            };
+            reader.readAsText(file);
+            // Reset the file input so the same file can be loaded again
+            event.target.value = null;
+        }
+    }
+
+    function togglePreview() {
+        isInPreviewMode = !isInPreviewMode;
+
+        if (isInPreviewMode) {
+            // Enter preview mode
+            topbar.style.display = 'none';
+            if (propertiesPanel.style.display === 'block') {
+                propertiesPanel.style.display = 'none';
+                currentlySelectedElement = selectedElement;
+                if (selectedElement) {
+                    selectedElement.style.border = '';
+                    selectedElement = null;
+                }
+            }
+
+            // Remove draggable cursor and selection styling
+            const draggableElements = document.querySelectorAll('.draggable');
+            draggableElements.forEach(element => {
+                element.style.cursor = 'default';
+                element.onclick = null; // Disable selection
+            });
+
+            // Optionally, disable dragging (we can refine this if needed)
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('touchmove', drag, { passive: false });
+
+            // Add a way to exit preview
+            const exitPreviewButton = document.createElement('button');
+            exitPreviewButton.textContent = 'Exit Preview';
+            exitPreviewButton.id = 'exitPreviewButton';
+            document.body.appendChild(exitPreviewButton);
+            exitPreviewButton.onclick = togglePreview;
+        } else {
+            // Exit preview mode
