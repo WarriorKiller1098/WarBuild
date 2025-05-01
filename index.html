@@ -22,7 +22,7 @@
         .topbar {
             background-color: #ededed;
             padding: 5px 5px;
-            display: flex;
+            display: block;
             justify-content: center;
             align-content: center;
         }
@@ -39,7 +39,7 @@
             left: 50%;
             transform: translate(-50%, -50%); /* Center the panel */
             background-color: white;
-            border: 1px solid #ccc;
+            border: 1px solid;
             padding: 20px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             z-index: 1000; /* Ensure it's on top of other elements */
@@ -70,14 +70,9 @@
             padding: 10px 15px;
             cursor: pointer;
         }
-
-        #exitPreviewButton {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            padding: 10px 15px;
-            cursor: pointer;
-            z-index: 1001; /* Ensure it's above other elements */
+    
+        .center {
+            
         }
     </style>
 </head>
@@ -90,10 +85,9 @@
     <button onclick="newbutton()">Button</button>
     <button onclick="newbox()">Box</button>
     <button onclick="newimage()">Image</button>
-    <button style="margin-left: 30px; margin-right: 10px;" onclick="showPropertiesPanel()">Properties</button>
-    <button onclick="saveProject()">Save</button>
-    <button onclick="loadProject()">Load</button>
-    <button onclick="togglePreview()">Preview</button>
+    <button style="margin-left: 30px;" onclick="showPropertiesPanel()">Properties</button>
+    <button class="center" onclick="saveProject()">Save</button>
+    <button class="center" onclick="loadProject()">Load</button>
 </div>
 
 <div id="propertiesPanel" class="properties-panel">
@@ -121,6 +115,7 @@
 
     <label for="imageSrc">Image Source (URL):</label>
     <input type="text" id="imageSrc" oninput="updateProperty('src', this.value)">
+    <button class="nothing" onclick="updateProperty('src', https://www.picsum.photos/1000/1000)">Default</button>
 
     <button onclick="hidePropertiesPanel()">Close</button>
 </div>
@@ -140,9 +135,6 @@
     const textInput = document.getElementById('text');
     const imageSrcInput = document.getElementById('imageSrc');
     const imageFileInput = document.getElementById('imageFile');
-    let isInPreviewMode = false;
-    const topbar = document.querySelector('.topbar');
-    let currentlySelectedElement = null; // To remember the selected element when exiting preview
 
     function showPropertiesPanel() {
         if (selectedElement) {
@@ -234,7 +226,7 @@
             clientY = e.clientY;
         } else if (e.type === 'touchmove') {
             clientX = e.touches[0].clientX;
-            clientY = e.clientY;
+            clientY = e.touches[0].clientY;
         }
 
         draggedElement.style.left = clientX - offsetX + 'px';
@@ -274,7 +266,7 @@
     }
     function newimage() {
         let img = document.createElement("img");
-        img.src = "https://via.placeholder.com/150"; // Default image
+        img.src = "https://www.picsum.photos/1000/1000"; // Default image
         img.style.width = "150px";
         img.style.height = "150px";
         document.body.appendChild(img);
@@ -421,38 +413,6 @@
             event.target.value = null;
         }
     }
-
-    function togglePreview() {
-        isInPreviewMode = !isInPreviewMode;
-
-        if (isInPreviewMode) {
-            // Enter preview mode
-            topbar.style.display = 'none';
-            if (propertiesPanel.style.display === 'block') {
-                propertiesPanel.style.display = 'none';
-                currentlySelectedElement = selectedElement;
-                if (selectedElement) {
-                    selectedElement.style.border = '';
-                    selectedElement = null;
-                }
-            }
-
-            // Remove draggable cursor and selection styling
-            const draggableElements = document.querySelectorAll('.draggable');
-            draggableElements.forEach(element => {
-                element.style.cursor = 'default';
-                element.onclick = null; // Disable selection
-            });
-
-            // Optionally, disable dragging (we can refine this if needed)
-            document.removeEventListener('mousemove', drag);
-            document.removeEventListener('touchmove', drag, { passive: false });
-
-            // Add a way to exit preview
-            const exitPreviewButton = document.createElement('button');
-            exitPreviewButton.textContent = 'Exit Preview';
-            exitPreviewButton.id = 'exitPreviewButton';
-            document.body.appendChild(exitPreviewButton);
-            exitPreviewButton.onclick = togglePreview;
-        } else {
-            // Exit preview mode
+</script>
+</body>
+</html>
